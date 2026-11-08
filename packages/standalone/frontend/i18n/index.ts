@@ -18,13 +18,14 @@ const STORAGE_KEY = 'ofm-locale'
 const EVENT_NAME = 'ofm:locale-changed'
 
 export function getLocale(): Locale {
-  const docLang = document.documentElement.lang?.toLowerCase() ?? ''
-  if (docLang.startsWith('en')) return 'en'
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored === 'zh') return 'zh'
     if (stored === 'en') return 'en'
   } catch { /* storage unavailable */ }
-  return 'zh'
+  const docLang = document.documentElement.lang?.toLowerCase() ?? ''
+  if (docLang.startsWith('zh')) return 'zh'
+  return 'en'
 }
 
 export function setLocale(locale: Locale): void {
@@ -59,6 +60,6 @@ export function useLocale(): [Locale, (locale: Locale) => void] {
 export function useT(): (key: TranslationKey) => string {
   const [locale] = useLocale()
   const dict: TranslationDict = locale === 'en' ? (en as unknown as TranslationDict) : (zh as unknown as TranslationDict)
-  const defaultDict: TranslationDict = zh as unknown as TranslationDict
+  const defaultDict: TranslationDict = en as unknown as TranslationDict
   return (key: TranslationKey) => dict[key] ?? defaultDict[key] ?? key
 }

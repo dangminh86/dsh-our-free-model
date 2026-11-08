@@ -131,11 +131,11 @@ export function ThemeToggle() {
 export function LangToggle() {
   const [locale, setLocale] = useLocale()
   const isEn = locale === 'en'
-  return <Button variant="ghost" className="lang-toggle" aria-label={isEn ? '切换语言' : 'Toggle language'}
-    title={isEn ? 'Switch to Chinese' : '切换到英文'}
+  return <Button variant="ghost" className="lang-toggle" aria-label={isEn ? 'Switch to Chinese' : 'Switch to English'}
+    title={isEn ? 'Switch to Chinese' : 'Switch to English'}
     onClick={() => setLocale(isEn ? 'zh' : 'en')}>
     <Languages size={15} style={{ marginRight: 4 }} />
-    <span style={{ fontSize: 12, fontWeight: 600 }}>{isEn ? '中' : 'EN'}</span>
+    <span style={{ fontSize: 12, fontWeight: 600 }}>{isEn ? '中文' : 'EN'}</span>
   </Button>
 }
 
@@ -191,5 +191,5 @@ export function Sidebar({ page, summary, host, onDisclaimer, pluginPages = [] }:
 export function Topbar({ page, summary, pluginPages = [] }: { page: Page; summary?: Summary; pluginPages?: PluginPage[] }) {
   const t = useT()
   return <><div className="console-breadcrumb"><span>{t('breadcrumbWorkspace')}</span><ChevronRight size={14} /><strong key={page} className="console-breadcrumb-current">{pageLabel(page, pluginPages, t)}</strong></div>
-    <div className="console-topbar-status"><span className="status-dot" /><span>{summary?.settings.enabled === false ? t('statusPaused') : t('statusLocal')}</span><span className="topbar-divider" /><span>LOCAL</span></div></>
+    <div className="console-topbar-status"><span className="status-dot" /><span>{summary?.settings.enabled === false ? t('statusPaused') : t('statusLocal')}</span><span className="topbar-divider" /><span>LOCAL</span><span className="topbar-divider" /><LangToggle /></div></>
 }
