@@ -3,17 +3,14 @@ import { Maximize2, Minimize2, RefreshCw, Settings2 } from 'lucide-react'
 import { Button } from './components/ui'
 import { management } from './management'
 import './workspace.css'
+import { useT } from './i18n'
 
 /**
  * The model workspace: the same embedded engine the plugin's settings page runs,
  * mounted here at `/api/management/engine/ui/`.
- *
- * The engine serves its own page, so this component owns three things only —
- * starting it, telling it which theme the console is using, and telling the
- * catalog when the page changed something. Everything inside the frame is the
- * engine's own UI.
  */
 export function Workspace({ active }: { active: boolean }) {
+  const t = useT()
   const [state, setState] = useState<'starting' | 'ready' | 'error'>('starting')
   const [error, setError] = useState('')
   const [generation, setGeneration] = useState(0)
@@ -56,10 +53,10 @@ export function Workspace({ active }: { active: boolean }) {
       .catch(reason => {
         if (!alive) return
         setState('error')
-        setError(reason instanceof Error ? reason.message : '模型工作台启动失败')
+        setError(reason instanceof Error ? reason.message : t('wsFailed'))
       })
     return () => { alive = false }
-  }, [active, generation])
+  }, [active, generation, t])
 
   useEffect(() => {
     const changed = (event: MessageEvent) => {
@@ -87,24 +84,24 @@ export function Workspace({ active }: { active: boolean }) {
     try {
       await management('/engine/refresh', {})
       frame.current?.contentWindow?.postMessage({ type: 'ofm:engine-action', action: 'refresh' }, window.location.origin)
-    } catch { setError('刷新失败，请重试') }
+    } catch { setError(t('errRequestFailed')) }
   }
 
   const toolbar = (
     <header className="ws-toolbar">
       <div className="ws-title">
-        <h2>模型工作台</h2>
-        <p>在应用内管理渠道、账号与模型；改动会同步进模型清单。</p>
+        <h2>{t('wsTitle')}</h2>
+        <p>{t('wsSubtitle')}</p>
       </div>
-      <div className="ws-tools" role="group" aria-label="模型工作台操作">
+      <div className="ws-tools" role="group" aria-label={t('wsTitle')}>
         <Button variant="ghost" size="icon"
-          title={expanded ? '退出全屏' : '全屏'} aria-label={expanded ? '退出全屏' : '全屏'}
+          title={expanded ? t('wsExitFullscreen') : t('wsFullscreen')} aria-label={expanded ? t('wsExitFullscreen') : t('wsFullscreen')}
           onClick={() => setExpanded(value => !value)}>
           {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
         </Button>
         {state === 'ready' && <>
-          <Button variant="ghost" size="icon" title="刷新" aria-label="刷新" onClick={() => void refresh()}><RefreshCw size={17} /></Button>
-          <Button variant="ghost" size="icon" title="工作台设置" aria-label="工作台设置"
+          <Button variant="ghost" size="icon" title={t('overviewRefresh')} aria-label={t('overviewRefresh')} onClick={() => void refresh()}><RefreshCw size={17} /></Button>
+          <Button variant="ghost" size="icon" title={t('wsSettings')} aria-label={t('wsSettings')}
             onClick={() => frame.current?.contentWindow?.postMessage({ type: 'ofm:engine-action', action: 'settings' }, window.location.origin)}>
             <Settings2 size={17} />
           </Button>
@@ -117,13 +114,13 @@ export function Workspace({ active }: { active: boolean }) {
     <div className={`ws-body ${expanded ? 'is-expanded' : ''}`} ref={host}>
       {error && <div className="ws-error" role="alert">{error}</div>}
       {state === 'ready'
-        ? <iframe ref={frame} className="ws-frame" title="模型工作台"
+        ? <iframe ref={frame} className="ws-frame" title={t('wsTitle')}
             src="/api/management/engine/ui/?mode=window&view=providers"
             allow="clipboard-write" referrerPolicy="same-origin"
             onLoad={syncTheme} />
         : <div className="ws-empty" role="status">
-            <span>{state === 'starting' ? '正在启动模型工作台…' : '模型工作台未能启动'}</span>
-            {state === 'error' && <Button onClick={() => { started.current = false; setGeneration(n => n + 1) }}>重试</Button>}
+            <span>{state === 'starting' ? t('wsStarting') : t('wsFailed')}</span>
+            {state === 'error' && <Button onClick={() => { started.current = false; setGeneration(n => n + 1) }}>{t('retry')}</Button>}
           </div>}
     </div>
   )
