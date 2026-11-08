@@ -14,6 +14,7 @@ type NumberField = 'defaultMaxTokens' | 'probeIntervalMinutes'
 export function Settings({ summary, host, active }: { summary: Summary; host: Host; active: boolean }) {
   const t = useT()
   const [locale] = useLocale()
+  const isEn = locale === 'en'
   const visibility = visibilityCopy(locale)
 
   const connectionError = (reason: unknown) => reason instanceof Error
@@ -49,7 +50,7 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (savingRef.current || !activeRef.current) return
-    const validation = validateSettingsDraft(state.draft)
+    const validation = validateSettingsDraft(state.draft, isEn)
     setErrors(validation.errors); setMessage(''); setError('')
     if (!validation.patch) return
     const started = ++generation.current

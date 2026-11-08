@@ -48,46 +48,44 @@ function ClientRow({ client, summary, onChanged }: { client: Client; summary: Su
   useEffect(() => () => { live.current = false }, [])
   const availableModels = useMemo(() => summary.catalog.filter(row => row.routable && !row.hiddenByUser && !row.hiddenByGroup), [summary.catalog])
   const dirty = executable !== client.executable || cwd !== client.cwd || model !== client.model || mode !== client.mode
-
   const run = async (action: 'save' | 'launch' | 'stop') => {
     if (lock.current) return
     lock.current = true; setBusy(action); setError(''); setStatus('')
     try {
       if (action !== 'stop' && (dirty || action === 'save')) {
-        if (!executable.trim()) throw new Error(isEn ? 'Please set the absolute path to the client executable.' : '请设置客户端可执行文件的绝对路径。')
+        if (!executable.trim()) throw new Error(t('agPathRequired'))
         await management('/workbench/clients/save', { id: client.id, executable: executable.trim(), cwd: cwd.trim(), model, mode })
       }
       if (action !== 'save') await management(`/workbench/clients/${action}`, { id: client.id })
       if (live.current) {
-        setStatus(action === 'launch' ? (isEn ? 'Launch request completed.' : '启动请求已完成。') : action === 'stop' ? (isEn ? 'Process stopped.' : '已停止本工作台启动的进程。') : (isEn ? 'Config saved.' : '配置已保存。'))
+        setStatus(action === 'launch' ? t('agLaunchCompleted') : action === 'stop' ? t('agProcessStopped') : t('agConfigSaved'))
         await onChanged()
       }
     } catch (reason) { if (live.current) setError(failureMessage(reason)) }
     finally { lock.current = false; if (live.current) setBusy('') }
   }
-
   return <div className="wb-client" data-running={client.running ? 'true' : undefined}>
     <div className="wb-client-row">
       <span className={`wb-app-icon ${client.kind === 'desktop' ? 'is-green' : ''}`}>{client.kind === 'desktop' ? <Monitor size={22} /> : <Terminal size={22} />}</span>
       <div className="wb-client-name"><strong>{client.name}</strong><small>{client.kind === 'desktop' ? t('agDesktopApp') : t('agCliClient')}<span> · </span>{client.running ? t('agRunning') : client.installed ? t('agDetected') : t('agNotDetected')}</small></div>
-      <label className="wb-model-select"><span className="wb-sr-only">{client.name} {t('colModelId')}</span><select value={model} disabled={!!busy || client.running || client.nativeOnly} onChange={event => { setModel(event.target.value); setStatus('') }}>
-        <option value="">{mode === 'gateway' ? (isEn ? 'Select Gateway Model' : '选择网关模型') : (isEn ? 'Client Default Model' : '客户端默认模型')}</option>
-        {model && !availableModels.some(row => row.id === model) && <option value={model}>{model} ({isEn ? 'Current' : '当前配置'})</option>}
+      <label className="wb-model-select"><span className="wb-sr-only">{client.name} {t('agModelId')}</span><select value={model} disabled={!!busy || client.running || client.nativeOnly} onChange={event => { setModel(event.target.value); setStatus('') }}>
+        <option value="">{mode === 'gateway' ? t('agSelectGatewayModel') : t('agClientDefaultModel')}</option>
+        {model && !availableModels.some(row => row.id === model) && <option value={model}>{model} ({t('agCurrentConfig')})</option>}
         {availableModels.map(row => <option key={row.id} value={row.id}>{row.name || row.id}</option>)}
       </select></label>
-      <Badge tone={client.running ? 'success' : 'neutral'} dot={!!client.running}>{client.running ? t('agRunning') : mode === 'gateway' ? 'API' : (isEn ? 'Native' : '原生配置')}</Badge>
+      <Badge tone={client.running ? 'success' : 'neutral'} dot={!!client.running}>{client.running ? t('agRunning') : mode === 'gateway' ? t('agThirdPartyApi') : t('agNativeConfig')}</Badge>
       <div className="wb-client-actions">
-        <Button variant="ghost" title={`${client.name} Settings`} aria-label={`${client.name} Settings`} aria-expanded={expanded} disabled={!!busy} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</Button>
+        <Button variant="ghost" title={t('agClientLaunchSettings').replace('{name}', client.name)} aria-label={t('agClientLaunchSettings').replace('{name}', client.name)} aria-expanded={expanded} disabled={!!busy} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</Button>
         {client.running ? <Button variant="outline" disabled={!!busy} busy={busy === 'stop'} onClick={() => void run('stop')}><Square size={13} />{t('agStop')}</Button>
           : <Button disabled={!!busy || !executable.trim() || (mode === 'gateway' && !model)} busy={busy === 'launch'} onClick={() => void run('launch')}><Play size={14} />{t('agLaunch')}</Button>}
       </div>
     </div>
     {expanded && <form className="wb-client-settings" onSubmit={event => { event.preventDefault(); void run('save') }}>
-      <label>{t('agExecutable')}<Input value={executable} disabled={!!busy || client.running} placeholder={isEn ? 'Absolute path to executable' : '可执行文件的绝对路径'} onChange={event => setExecutable(event.target.value)} /></label>
-      <label>{t('agWorkdir')}<Input value={cwd} disabled={!!busy || client.running} placeholder={isEn ? 'Default working directory' : '默认工作目录'} onChange={event => setCwd(event.target.value)} /></label>
-      <label>{t('agAccessMode')}<select value={mode} disabled={!!busy || client.running || client.nativeOnly} onChange={event => setMode(event.target.value as Client['mode'])}><option value="gateway">{t('agGatewayMode')}</option><option value="native">{t('agNativeMode')}</option></select></label>
-      <Button type="submit" variant="outline" busy={busy === 'save'} disabled={!!busy || !dirty || !!client.running}><Save size={14} />{t('endpointCopy') === 'Copy' ? 'Save' : '保存'}</Button>
-      {client.lastLaunchedAt && <small className="wb-client-last">{isEn ? 'Last launched' : '最近启动'} {dateLabel(client.lastLaunchedAt, isEn ? 'en-US' : 'zh-CN')}</small>}
+      <label>{t('agExecutable')}<Input value={executable} disabled={!!busy || client.running} placeholder={t('agExecutablePlaceholder')} onChange={event => setExecutable(event.target.value)} /></label>
+      <label>{t('agWorkingDir')}<Input value={cwd} disabled={!!busy || client.running} placeholder={t('agWorkingDirPlaceholder')} onChange={event => setCwd(event.target.value)} /></label>
+      <label>{t('agAccessMode')}<select value={mode} disabled={!!busy || client.running || client.nativeOnly} onChange={event => setMode(event.target.value as Client['mode'])}><option value="gateway">{t('agAccessGateway')}</option><option value="native">{t('agAccessNative')}</option></select></label>
+      <Button type="submit" variant="outline" busy={busy === 'save'} disabled={!!busy || !dirty || !!client.running}><Save size={14} />{t('agSave')}</Button>
+      {client.lastLaunchedAt && <small className="wb-client-last">{t('agLastLaunched').replace('{date}', dateLabel(client.lastLaunchedAt, isEn ? 'en-US' : 'zh-CN'))}</small>}
     </form>}
     {(error || client.error) && <p className="wb-row-feedback wb-error" role="alert"><CircleAlert size={14} />{error || client.error}</p>}
     {status && <p className="wb-row-feedback wb-status" role="status"><Check size={14} />{status}</p>}
@@ -105,10 +103,10 @@ function QuotaMeter({ title, window }: { title: string; window?: QuotaWindow }) 
       : finite(window?.remaining) && finite(window?.limit) && window.limit > 0 ? 100 * (1 - window.remaining / window.limit) : undefined
   const clamped = used === undefined ? undefined : Math.min(100, Math.max(0, used))
   return <div className="wb-quota">
-    <div><span>{title}</span><strong>{clamped === undefined ? (isEn ? 'Unknown' : '未知') : `${Math.round(clamped)}% ${t('agQuotaUsed')}`}</strong></div>
-    {clamped === undefined ? <div className="wb-quota-track is-unknown" aria-label={`${title} quota unknown`} />
-      : <div className="wb-quota-track" role="progressbar" aria-label={`${title} quota`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamped)}><span className={clamped >= 90 ? 'is-low' : clamped >= 70 ? 'is-warn' : ''} style={{ width: `${clamped}%` }} /></div>}
-    <small>{window?.resetsAt && dateLabel(window.resetsAt, isEn ? 'en-US' : 'zh-CN') ? `${dateLabel(window.resetsAt, isEn ? 'en-US' : 'zh-CN')} ${t('agQuotaResets')}` : t('agQuotaUnknownReset')}</small>
+    <div><span>{title}</span><strong>{clamped === undefined ? t('agQuotaUnknown') : t('agQuotaUsed').replace('{percent}', String(Math.round(clamped)))}</strong></div>
+    {clamped === undefined ? <div className="wb-quota-track is-unknown" aria-label={t('agQuotaUnknownAria').replace('{title}', title)} />
+      : <div className="wb-quota-track" role="progressbar" aria-label={t('agQuotaUsedAria').replace('{title}', title)} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamped)}><span className={clamped >= 90 ? 'is-low' : clamped >= 70 ? 'is-warn' : ''} style={{ width: `${clamped}%` }} /></div>}
+    <small>{window?.resetsAt && dateLabel(window.resetsAt, isEn ? 'en-US' : 'zh-CN') ? t('agResetAt').replace('{date}', dateLabel(window.resetsAt, isEn ? 'en-US' : 'zh-CN')) : t('agResetUnknown')}</small>
   </div>
 }
 
@@ -137,12 +135,12 @@ function ImportSubscription({ candidates, onClose, onSaved }: { candidates: Cand
     const sequence = ++fileSequence.current
     setError(''); setFilename(''); fileValue.current = undefined
     if (!file) return
-    if (file.size > 768 * 1024) { setError('JSON 文件不能超过 768 KB。'); return }
+    if (file.size > 768 * 1024) { setError(t('agJsonTooLarge')); return }
     try {
       const value: unknown = JSON.parse(await file.text())
       if (!object(value)) throw new Error()
       if (live.current && sequence === fileSequence.current) { fileValue.current = value; setFilename(file.name) }
-    } catch { if (live.current && sequence === fileSequence.current) setError('文件必须是有效的 JSON 对象。') }
+    } catch { if (live.current && sequence === fileSequence.current) setError(t('agValidJsonObject')) }
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -151,12 +149,12 @@ function ImportSubscription({ candidates, onClose, onSaved }: { candidates: Cand
     let credentials: Record<string, unknown>
     let payload: Record<string, unknown> = {}
     if (tab === 'api') {
-      if (!apiKey.trim()) { setError('请输入 API Key。'); return }
+      if (!apiKey.trim()) { setError(t('agEnterApiKey')); return }
       credentials = { apiKey: apiKey.trim() }
     } else {
       let parsed: unknown
-      try { parsed = tab === 'file' ? fileValue.current : JSON.parse(json) } catch { setError('请输入有效的 JSON 对象。'); return }
-      if (!object(parsed)) { setError(tab === 'file' ? '请先选择 JSON 文件。' : '凭据必须是 JSON 对象。'); return }
+      try { parsed = tab === 'file' ? fileValue.current : JSON.parse(json) } catch { setError(t('agEnterValidJson')); return }
+      if (!object(parsed)) { setError(tab === 'file' ? t('agSelectFileFirst') : t('agCredMustBeObject')); return }
       credentials = object(parsed.credentials) ? parsed.credentials : parsed
       if (object(parsed.credentials)) {
         if (typeof parsed.provider === 'string') payload.provider = parsed.provider
@@ -166,14 +164,14 @@ function ImportSubscription({ candidates, onClose, onSaved }: { candidates: Cand
         if (Array.isArray(parsed.models) && parsed.models.every(value => typeof value === 'string')) payload.models = parsed.models
       }
     }
-    if (!Object.keys(credentials).length) { setError('凭据对象不能为空。'); return }
+    if (!Object.keys(credentials).length) { setError(t('agCredNotEmpty')); return }
     const actualProvider = typeof payload.provider === 'string' ? payload.provider : provider.trim()
-    if (!['codex', 'claude', 'gemini', 'api'].includes(actualProvider)) { setError('请选择受支持的订阅供应商。'); return }
+    if (!['codex', 'claude', 'gemini', 'api'].includes(actualProvider)) { setError(t('agUnsupportedProvider')); return }
     const actualUrl = actualProvider === 'api' ? baseUrl.trim() || (typeof payload.baseUrl === 'string' ? payload.baseUrl : '') : ''
-    if (actualProvider === 'api' && !actualUrl) { setError('API 订阅需要填写 API 地址。'); return }
+    if (actualProvider === 'api' && !actualUrl) { setError(t('agApiUrlRequired')); return }
     if (actualUrl) {
       try { const url = new URL(actualUrl); if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error() }
-      catch { setError('请输入不含用户名和密码的 HTTP(S) API 地址。'); return }
+      catch { setError(t('agInvalidHttpUrl')); return }
     }
     payload = {
       provider: actualProvider, ...(label.trim() ? { label: label.trim() } : {}),
@@ -183,8 +181,8 @@ function ImportSubscription({ candidates, onClose, onSaved }: { candidates: Cand
     if (actualProvider === 'api') { payload.baseUrl = actualUrl; payload.format = payload.format ?? format }
     else { delete payload.baseUrl; delete payload.format }
     if (quotaOnly) payload.models = []
-    else if (!Array.isArray(payload.models) || payload.models.length === 0) { setError('请填写模型 ID，或选择“仅管理额度”。'); return }
-    if (!payload.provider) { setError('请输入供应商 ID。'); return }
+    else if (!Array.isArray(payload.models) || payload.models.length === 0) { setError(t('agModelIdRequired')); return }
+    if (!payload.provider) { setError(t('agProviderIdRequired')); return }
     setBusy(true)
     try {
       await management('/subscriptions/import', payload)
@@ -193,20 +191,20 @@ function ImportSubscription({ candidates, onClose, onSaved }: { candidates: Cand
     } catch (reason) { if (live.current) setError(failureMessage(reason)) }
     finally { if (live.current) setBusy(false) }
   }
-  return <WorkbenchDialog title={t('agImportSub')} onClose={() => { clear(); onClose() }} busy={busy}>
+  return <WorkbenchDialog title={t('agImportTitle')} onClose={() => { clear(); onClose() }} busy={busy}>
     <form className="wb-form" onSubmit={event => void submit(event)}>
-      <div className="wb-segments wb-import-tabs" aria-label="tabs">
-        {([['api', 'API Key', KeyRound], ['json', 'JSON', FileJson], ['file', 'File', Upload]] as const).map(([id, name, Icon]) => <button key={id} type="button" aria-pressed={tab === id} disabled={busy} onClick={() => chooseTab(id)}><Icon size={14} />{name}</button>)}
+      <div className="wb-segments wb-import-tabs" aria-label={t('agImportMethodAria')}>
+        {([['api', t('agTabApi'), KeyRound], ['json', t('agTabJson'), FileJson], ['file', t('agTabFile'), Upload]] as const).map(([id, name, Icon]) => <button key={id} type="button" aria-pressed={tab === id} disabled={busy} onClick={() => chooseTab(id)}><Icon size={14} />{name}</button>)}
       </div>
-      <div className="wb-form-grid"><label>Provider<select required value={provider} disabled={busy || tab === 'api'} onChange={event => setProvider(event.target.value)}><option value="api">Third-party API</option><option value="codex">Codex</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></label>
-        <label>Account Label<Input value={label} disabled={busy} placeholder="optional" onChange={event => setLabel(event.target.value)} /></label></div>
-      {tab === 'api' && <label>API Key<Input type="password" autoComplete="new-password" spellCheck={false} required value={apiKey} disabled={busy} onChange={event => setApiKey(event.target.value)} /></label>}
-      {tab === 'json' && <label>JSON<textarea rows={6} spellCheck={false} autoComplete="off" required value={json} disabled={busy} onChange={event => setJson(event.target.value)} /></label>}
-      {tab === 'file' && <label className="wb-file"><Upload size={22} /><span>{filename || 'Select JSON file'}</span><input ref={fileInput} type="file" accept=".json,application/json" disabled={busy} aria-label="file" onChange={event => void readFile(event.target.files?.[0])} /></label>}
-      {provider === 'api' && <label>API Base URL<Input type="url" value={baseUrl} disabled={busy} placeholder="https://api.example.com/v1" onChange={event => setBaseUrl(event.target.value)} /></label>}
-      <div className="wb-form-grid">{provider === 'api' && <label>Format<select value={format} disabled={busy} onChange={event => setFormat(event.target.value)}><option value="openai-chat">OpenAI Chat</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>}
-        <label>Model IDs<Input value={models} disabled={busy || quotaOnly} placeholder="comma-separated" onChange={event => setModels(event.target.value)} /></label></div>
-      <label className="wb-checkbox"><input type="checkbox" checked={quotaOnly} disabled={busy} onChange={event => setQuotaOnly(event.target.checked)} /><span>{t('agSubQuotaOnly')}</span></label>
+      <div className="wb-form-grid"><label>{t('agProvider')}<select required value={provider} disabled={busy || tab === 'api'} onChange={event => setProvider(event.target.value)}><option value="api">{t('agProviderApi')}</option><option value="codex">{t('agProviderCodex')}</option><option value="claude">{t('agProviderClaude')}</option><option value="gemini">{t('agProviderGemini')}</option></select></label>
+        <label>{t('agAccountName')}<Input value={label} disabled={busy} placeholder={t('agOptional')} onChange={event => setLabel(event.target.value)} /></label></div>
+      {tab === 'api' && <label>{t('agTabApi')}<Input type="password" autoComplete="new-password" spellCheck={false} required value={apiKey} disabled={busy} onChange={event => setApiKey(event.target.value)} /></label>}
+      {tab === 'json' && <label>{t('agCredentialsJson')}<textarea rows={6} spellCheck={false} autoComplete="off" required value={json} disabled={busy} onChange={event => setJson(event.target.value)} /></label>}
+      {tab === 'file' && <label className="wb-file"><Upload size={22} /><span>{filename || t('agSelectJsonFile')}</span><input ref={fileInput} type="file" accept=".json,application/json" disabled={busy} aria-label={t('agSelectJsonFileAria')} onChange={event => void readFile(event.target.files?.[0])} /></label>}
+      {provider === 'api' && <label>{t('agApiUrl')}<Input type="url" value={baseUrl} disabled={busy} placeholder="https://api.example.com/v1" onChange={event => setBaseUrl(event.target.value)} /></label>}
+      <div className="wb-form-grid">{provider === 'api' && <label>{t('agProtocol')}<select value={format} disabled={busy} onChange={event => setFormat(event.target.value)}><option value="openai-chat">OpenAI Chat</option><option value="openai-responses">OpenAI Responses</option><option value="anthropic-messages">Anthropic Messages</option></select></label>}
+        <label>{t('agModelId')}<Input value={models} disabled={busy || quotaOnly} placeholder={t('agCommaSeparated')} onChange={event => setModels(event.target.value)} /></label></div>
+      <label className="wb-checkbox"><input type="checkbox" checked={quotaOnly} disabled={busy} onChange={event => setQuotaOnly(event.target.checked)} /><span>{t('agQuotaOnlyCheckbox')}</span></label>
       {error && <p className="wb-error" role="alert"><CircleAlert size={15} />{error}</p>}
       <div className="wb-form-actions"><Button variant="outline" disabled={busy} onClick={() => { clear(); onClose() }}>{t('pdCancel')}</Button><Button type="submit" busy={busy}><Upload size={15} />{t('agImportSub')}</Button></div>
     </form>
@@ -240,56 +238,55 @@ export function Agents({ summary, active, host }: { summary: Summary; active: bo
     try {
       await management(path, body)
       if (!live.current) return
-      setStatus(path.endsWith('/quota') ? (isEn ? 'Quota refreshed.' : '额度查询已完成。') : path.endsWith('/import-local') ? (isEn ? 'Local subscription imported.' : '本机订阅已导入。') : (isEn ? 'Subscription settings updated.' : '订阅设置已更新。'))
+      setStatus(path.endsWith('/quota') ? t('agQuotaQueried') : path.endsWith('/import-local') ? t('agLocalSubImported') : t('agSubSettingsUpdated'))
       setRemoving(''); await subscriptions.reload()
       if (!path.endsWith('/quota')) await host.refresh()
     } catch (reason) { if (live.current) setError(failureMessage(reason)) }
     finally { lock.current = false; if (live.current) setBusy('') }
   }
   const rows = accounts.filter(account => `${account.label} ${account.provider} ${account.plan ?? ''}`.toLowerCase().includes(search.trim().toLowerCase()))
-
   return <div className="wb-page">
-    <header className="wb-heading"><div><span className="wb-eyebrow">{t('agEyebrow')}</span><h1>{t('agTitle')}</h1><p>{t('agSubtitle')}</p></div>
-      <Button variant="outline" title={t('pdRefresh')} aria-label={t('pdRefresh')} disabled={workbench.loading || subscriptions.loading || !!busy} busy={workbench.loading || subscriptions.loading} onClick={() => void refresh()}><RefreshCw size={15} /><span>{t('pdRefresh')}</span></Button></header>
+    <header className="wb-heading"><div><span className="wb-eyebrow">DESKTOP WORKBENCH</span><h1>{t('agTitle')}</h1><p>{t('agSubtitle')}</p></div>
+      <Button variant="outline" title={t('agRefreshWb')} aria-label={t('agRefreshWb')} disabled={workbench.loading || subscriptions.loading || !!busy} busy={workbench.loading || subscriptions.loading} onClick={() => void refresh()}><RefreshCw size={15} /><span>{t('agRefreshWb')}</span></Button></header>
     <div className="wb-summary"><span><strong>{workbench.data ? workbench.data.clients.filter(client => client.installed).length : '—'}</strong> {t('agInstalledClients')}</span><span><i className="wb-dot" /><strong>{workbench.data ? workbench.data.clients.filter(client => client.running).length : '—'}</strong> {t('agRunningClients')}</span><span><strong>{subscriptions.data || workbench.data ? accounts.filter(account => account.enabled).length : '—'}</strong> {t('agEnabledSubs')}</span></div>
-    <div className="wb-section-heading"><h2><Monitor size={17} />{t('agClientsHeading')}</h2><Badge tone="blue">API</Badge></div>
-    {workbench.error && <div className="wb-feedback wb-error" role="alert"><CircleAlert size={16} /><span>{workbench.error}</span><Button variant="outline" onClick={() => void workbench.reload()}>{t('retry')}</Button></div>}
+    <div className="wb-section-heading"><h2><Monitor size={17} />{t('agClientsHeading')}</h2><Badge tone="blue">{t('agThirdPartyBadge')}</Badge></div>
+    {workbench.error && <div className="wb-feedback wb-error" role="alert"><CircleAlert size={16} /><span>{workbench.error}</span><Button variant="outline" onClick={() => void workbench.reload()}>{t('btnRetry')}</Button></div>}
     <section className="wb-client-list" aria-label={t('agClientsHeading')} aria-busy={workbench.loading}>
       {workbench.data?.clients.map(client => <ClientRow key={client.id} client={client} summary={summary} onChanged={workbench.reload} />)}
-      {!workbench.data && workbench.loading && <div className="wb-empty" role="status"><RefreshCw size={22} /><strong>Loading clients…</strong></div>}
-      {workbench.data?.clients.length === 0 && <div className="wb-empty"><Terminal size={24} /><strong>No clients found</strong><Button variant="outline" onClick={() => void workbench.reload()}>{t('retry')}</Button></div>}
+      {!workbench.data && workbench.loading && <div className="wb-empty" role="status"><RefreshCw size={22} /><strong>{t('agDetectingClients')}</strong></div>}
+      {workbench.data?.clients.length === 0 && <div className="wb-empty"><Terminal size={24} /><strong>{t('agNoClientsAvailable')}</strong><Button variant="outline" onClick={() => void workbench.reload()}>{t('agRedetect')}</Button></div>}
     </section>
     <div className="wb-section-heading wb-subscription-heading"><h2><Clock3 size={17} />{t('agSubsHeading')} <small>{accounts.length}</small></h2>
-      <div><Button variant="outline" aria-expanded={local} onClick={() => setLocal(!local)}><FolderSearch size={15} />{t('agLocalDiscovery')}</Button><Button onClick={() => setImporting(true)}><Plus size={15} />{t('agImportSub')}</Button></div></div>
-    {local && <section className="wb-discovery" aria-label={t('agLocalDiscovery')}>
-      <div className="wb-discovery-heading"><strong>{t('agLocalSubs')}</strong><Button variant="ghost" aria-label={t('pdRefresh')} title={t('pdRefresh')} disabled={discovery.loading || !!busy} busy={discovery.loading} onClick={() => void discovery.reload()}><RefreshCw size={15} /></Button></div>
+      <div><Button variant="outline" aria-expanded={local} onClick={() => setLocal(!local)}><FolderSearch size={15} />{t('agDiscoverLocal')}</Button><Button onClick={() => setImporting(true)}><Plus size={15} />{t('agImportSub')}</Button></div></div>
+    {local && <section className="wb-discovery" aria-label={t('agDiscoverLocal')}>
+      <div className="wb-discovery-heading"><strong>{t('agLocalSubsHeading')}</strong><Button variant="ghost" aria-label={t('agRediscoverLocal')} title={t('agRediscoverLocal')} disabled={discovery.loading || !!busy} busy={discovery.loading} onClick={() => void discovery.reload()}><RefreshCw size={15} /></Button></div>
       {discovery.error && <p role="alert" className="wb-error">{discovery.error}</p>}
-      {candidates.map(candidate => <div className="wb-candidate" key={candidate.provider}><span><strong>{candidate.label}</strong><small>{candidate.provider}</small></span><Badge tone={candidate.available ? 'blue' : 'neutral'}>{candidate.available ? t('agAvailableToImport') : t('agNotFound')}</Badge><Button variant="outline" disabled={!candidate.available || !!busy} busy={busy === `local:${candidate.provider}`} onClick={() => void run('/subscriptions/import-local', { provider: candidate.provider }, `local:${candidate.provider}`)}><Upload size={14} />{t('agImportLocal')}</Button></div>)}
+      {candidates.map(candidate => <div className="wb-candidate" key={candidate.provider}><span><strong>{candidate.label}</strong><small>{candidate.provider}</small></span><Badge tone={candidate.available ? 'blue' : 'neutral'}>{candidate.available ? t('agCanImport') : t('agNotFound')}</Badge><Button variant="outline" disabled={!candidate.available || !!busy} busy={busy === `local:${candidate.provider}`} onClick={() => void run('/subscriptions/import-local', { provider: candidate.provider }, `local:${candidate.provider}`)}><Upload size={14} />{t('agImportSub')}</Button></div>)}
       {!discovery.loading && !candidates.length && !discovery.error && <p className="wb-discovery-empty">{t('agNoLocalSubsFound')}</p>}
     </section>}
-    <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><Input aria-label={t('agSearchPlaceholder')} placeholder={t('agSearchPlaceholder')} value={search} onChange={event => setSearch(event.target.value)} /></label><span className="wb-toolbar-meta">5h / Weekly Quota</span></div>
-    {(error || subscriptions.error) && <div className="wb-feedback wb-error" role="alert"><CircleAlert size={16} /><span>{error || subscriptions.error}</span><Button variant="outline" disabled={!!busy} onClick={() => { setError(''); void subscriptions.reload() }}>{t('retry')}</Button></div>}
+    <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><Input aria-label={t('agSearchSubsAria')} placeholder={t('agSearchSubsPlaceholder')} value={search} onChange={event => setSearch(event.target.value)} /></label><span className="wb-toolbar-meta">{t('agToolbarMeta')}</span></div>
+    {(error || subscriptions.error) && <div className="wb-feedback wb-error" role="alert"><CircleAlert size={16} /><span>{error || subscriptions.error}</span><Button variant="outline" disabled={!!busy} onClick={() => { setError(''); void subscriptions.reload() }}>{t('btnRetry')}</Button></div>}
     {status && <div className="wb-feedback wb-status" role="status"><Check size={16} />{status}</div>}
-    <section className="wb-account-list" aria-label="subscriptions" aria-busy={subscriptions.loading}>
+    <section className="wb-account-list" aria-label={t('agAccountsAria')} aria-busy={subscriptions.loading}>
       {rows.map(account => {
         const windows = account.quota?.windows ?? []
         const fiveHour = windows.find(window => window.kind === 'five_hour' || window.windowSeconds === 18000 || /5\s*h|5.?hour|five.?hour|5.?小时|session|short/i.test(window.name))
         const weekly = windows.find(window => window.kind === 'weekly' || window.windowSeconds === 604800 || /week|seven.?day|7.?day|周|星期/i.test(window.name))
         const other = windows.filter(window => window !== fiveHour && window !== weekly)
         return <div className="wb-account" key={account.id}>
-          <div className="wb-account-info"><span className="wb-app-icon is-green"><KeyRound size={20} /></span><div><strong>{account.label}</strong><small>{account.provider}{account.plan || account.quota?.plan ? ` · ${account.plan || account.quota?.plan}` : ''}</small><small>{account.models?.length ?? 0} {t('pdModelCount')}</small></div>
-            <Switch checked={account.enabled} aria-label={`Enable ${account.label}`} disabled={!!busy} onCheckedChange={enabled => void run('/subscriptions/enabled', { id: account.id, enabled }, `enable:${account.id}`)} /></div>
-          <div className="wb-quota-windows"><QuotaMeter title={t('agQuota5h')} window={fiveHour} /><QuotaMeter title={t('agQuotaWeekly')} window={weekly} />{other.map((window, index) => <QuotaMeter title={window.name} window={window} key={`${window.name}:${index}`} />)}</div>
-          <div className="wb-account-actions"><Button variant="ghost" title={`Refresh ${account.label}`} aria-label={`Refresh ${account.label}`} disabled={!!busy} busy={busy === `quota:${account.id}`} onClick={() => void run('/subscriptions/quota', { id: account.id }, `quota:${account.id}`)}><RefreshCw size={15} /></Button>
-            <Button variant="ghost" title={`Remove ${account.label}`} aria-label={`Remove ${account.label}`} className="wb-danger" disabled={!!busy} onClick={() => setRemoving(account.id)}><Trash2 size={15} /></Button></div>
+          <div className="wb-account-info"><span className="wb-app-icon is-green"><KeyRound size={20} /></span><div><strong>{account.label}</strong><small>{account.provider}{account.plan || account.quota?.plan ? ` · ${account.plan || account.quota?.plan}` : ''}</small><small>{t('agModelsCount').replace('{count}', String(account.models?.length ?? 0))}</small></div>
+            <Switch checked={account.enabled} aria-label={t('agToggleSubAria').replace('{label}', account.label)} disabled={!!busy} onCheckedChange={enabled => void run('/subscriptions/enabled', { id: account.id, enabled }, `enable:${account.id}`)} /></div>
+          <div className="wb-quota-windows"><QuotaMeter title={t('agFiveHour')} window={fiveHour} /><QuotaMeter title={t('agWeekly')} window={weekly} />{other.map((window, index) => <QuotaMeter title={window.name} window={window} key={`${window.name}:${index}`} />)}</div>
+          <div className="wb-account-actions"><Button variant="ghost" title={t('agRefreshQuotaTitle').replace('{label}', account.label)} aria-label={t('agRefreshQuotaTitle').replace('{label}', account.label)} disabled={!!busy} busy={busy === `quota:${account.id}`} onClick={() => void run('/subscriptions/quota', { id: account.id }, `quota:${account.id}`)}><RefreshCw size={15} /></Button>
+            <Button variant="ghost" title={t('agRemoveSubTitle').replace('{label}', account.label)} aria-label={t('agRemoveSubTitle').replace('{label}', account.label)} className="wb-danger" disabled={!!busy} onClick={() => setRemoving(account.id)}><Trash2 size={15} /></Button></div>
           <div className="wb-account-foot"><Badge tone={account.enabled ? 'success' : 'neutral'}>{account.enabled ? t('agSubActive') : t('agSubDisabled')}</Badge>{!account.models?.length && <Badge>{t('agSubQuotaOnly')}</Badge>}
-            <span>{account.quota?.error ? t('agQuotaUnavailable') : account.quota?.fetchedAt || account.quota?.checkedAt ? `Updated ${dateLabel(account.quota.fetchedAt ?? account.quota.checkedAt, isEn ? 'en-US' : 'zh-CN')}` : t('agQuotaNotQueried')}{account.quota?.state ? ` · ${account.quota.state}` : ''}</span></div>
+            <span>{account.quota?.error ? t('agQuotaUnavailable') : account.quota?.fetchedAt || account.quota?.checkedAt ? `${t('agUpdatedPrefix')}${dateLabel(account.quota.fetchedAt ?? account.quota.checkedAt, isEn ? 'en-US' : 'zh-CN')}` : t('agQuotaNotQueried')}{account.quota?.state ? ` · ${account.quota.state}` : ''}</span></div>
           {removing === account.id && <div className="wb-remove"><span>{t('agRemoveSubConfirm').replace('{label}', account.label)}</span><Button variant="outline" disabled={!!busy} onClick={() => setRemoving('')}>{t('pdCancel')}</Button><Button variant="outline" className="wb-danger" disabled={!!busy} busy={busy === `remove:${account.id}`} onClick={() => void run('/subscriptions/remove', { id: account.id }, `remove:${account.id}`)}><Trash2 size={14} />{t('pdConfirmRemove')}</Button></div>}
         </div>
       })}
       {!rows.length && <div className="wb-empty"><KeyRound size={24} /><strong>{search ? t('agNoMatchingSubs') : subscriptions.loading ? t('agLoadingSubs') : t('agNoSubsYet')}</strong>
         {search ? <Button variant="outline" onClick={() => setSearch('')}>{t('agClearSearch')}</Button> : <Button variant="outline" onClick={() => setImporting(true)}><Plus size={14} />{t('agImportSub')}</Button>}</div>}
     </section>
-    {importing && active && <ImportSubscription candidates={candidates} onClose={() => setImporting(false)} onSaved={async () => { await Promise.all([subscriptions.reload(), host.refresh()]); if (live.current) setStatus(isEn ? 'Subscription imported.' : '订阅已导入。') }} />}
+    {importing && active && <ImportSubscription candidates={candidates} onClose={() => setImporting(false)} onSaved={async () => { await Promise.all([subscriptions.reload(), host.refresh()]); if (live.current) setStatus(t('agSubImported')) }} />}
   </div>
 }

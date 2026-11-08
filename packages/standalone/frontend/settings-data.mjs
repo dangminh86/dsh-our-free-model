@@ -28,18 +28,19 @@ export function syncSettings(state, saved, saving) {
 }
 
 /** Only form-owned settings are submitted; preserve per-model choices made elsewhere.
- * @param {ReturnType<typeof settingsDraft>} draft */
-export function validateSettingsDraft(draft) {
+ * @param {ReturnType<typeof settingsDraft>} draft
+ * @param {boolean} [isEn] */
+export function validateSettingsDraft(draft, isEn = false) {
   /** @type {Partial<Record<'defaultMaxTokens' | 'probeIntervalMinutes', string>>} */
   const errors = {}
-  for (const [key, label, min, max] of [
-    ['defaultMaxTokens', '最大输出 Token', 512, 131072],
-    ['probeIntervalMinutes', '刷新间隔', 1, 1440],
+  for (const [key, labelZh, labelEn, min, max] of [
+    ['defaultMaxTokens', '最大输出 Token', 'Max Output Tokens', 512, 131072],
+    ['probeIntervalMinutes', '刷新间隔', 'Probe Interval', 1, 1440],
   ]) {
     const raw = draft[key].trim()
     const value = Number(raw)
     if (!raw || !Number.isInteger(value) || value < min || value > max) {
-      errors[key] = `${label}必须是 ${min}–${max} 的整数。`
+      errors[key] = isEn ? `${labelEn} must be an integer between ${min} and ${max}.` : `${labelZh}必须是 ${min}–${max} 的整数。`
     }
   }
   return {

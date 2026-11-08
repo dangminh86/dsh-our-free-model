@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 import { Button } from './components/ui'
 import type { PluginPage as PluginPageRecord } from './types'
+import { useT } from './i18n'
 
 interface ThemeMessage {
   __ofm: 1
@@ -42,6 +43,7 @@ function themeMessage(): ThemeMessage {
  * only the allowlisted RPC methods to the management API.
  */
 export function PluginPage({ page, onNotice }: { page: PluginPageRecord; onNotice?: (message: string) => void }) {
+  const t = useT()
   const frame = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(640)
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading')
@@ -102,10 +104,10 @@ export function PluginPage({ page, onNotice }: { page: PluginPageRecord; onNotic
           }),
         })
         const value = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(String(value?.error ?? `页面请求失败（${response.status}）`))
+        if (!response.ok) throw new Error(String(value?.error ?? `${t('plPageRequestFailed')} (${response.status})`))
         post({ __ofm: 1, type: 'rpc-reply', id, ok: true, result: value.result ?? null })
       } catch (reason) {
-        post({ __ofm: 1, type: 'rpc-reply', id, ok: false, error: reason instanceof Error ? reason.message : '页面请求失败' })
+        post({ __ofm: 1, type: 'rpc-reply', id, ok: false, error: reason instanceof Error ? reason.message : t('plPageRequestFailed') })
       }
     }
     window.addEventListener('message', onMessage)
@@ -116,19 +118,19 @@ export function PluginPage({ page, onNotice }: { page: PluginPageRecord; onNotic
       window.removeEventListener('message', onMessage)
       observer.disconnect()
     }
-  }, [page.pluginId, page.pageId, generation])
+  }, [page.pluginId, page.pageId, generation, t])
 
   return <section className="plugin-page" data-testid="plugin-page">
     <header className="plugin-page-header">
       <div><span className="eyebrow">PLUGIN PAGE</span><h1>{page.title}</h1><p>{page.pluginId} · v{page.version}{page.description ? ` · ${page.description}` : ''}</p></div>
       <div className="plugin-actions">
-        <Button variant="ghost" onClick={() => { setState('loading'); setGeneration(current => current + 1) }}><RefreshCw size={14} />重新加载</Button>
+        <Button variant="ghost" onClick={() => { setState('loading'); setGeneration(current => current + 1) }}><RefreshCw size={14} />{t('plPageReload')}</Button>
       </div>
     </header>
     {state === 'failed'
-      ? <div className="plugin-page-fallback" role="alert"><AlertCircle size={18} /><div><strong>插件页面未能加载</strong><p>页面文件可能已被卸载或完整性校验失败。可以回到插件中心重新安装。</p></div></div>
+      ? <div className="plugin-page-fallback" role="alert"><AlertCircle size={18} /><div><strong>{t('plPageFailed')}</strong><p>{t('plPageFailedHint')}</p></div></div>
       : <div className="plugin-page-frame">
-        {state === 'loading' && <p className="plugin-page-loading" role="status"><Loader2 className="spin" size={16} />正在加载插件页面…</p>}
+        {state === 'loading' && <p className="plugin-page-loading" role="status"><Loader2 className="spin" size={16} />{t('plPageLoading')}</p>}
         <iframe
           key={`${page.id}:${generation}`}
           ref={frame}

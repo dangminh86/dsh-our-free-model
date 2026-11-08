@@ -53,7 +53,7 @@ export function Workspace({ active }: { active: boolean }) {
       .catch(reason => {
         if (!alive) return
         setState('error')
-        setError(reason instanceof Error ? reason.message : t('wsFailed'))
+        setError(reason instanceof Error ? reason.message : t('wsStartFailed'))
       })
     return () => { alive = false }
   }, [active, generation, t])
@@ -84,7 +84,7 @@ export function Workspace({ active }: { active: boolean }) {
     try {
       await management('/engine/refresh', {})
       frame.current?.contentWindow?.postMessage({ type: 'ofm:engine-action', action: 'refresh' }, window.location.origin)
-    } catch { setError(t('errRequestFailed')) }
+    } catch { setError(t('wsRefreshFailed')) }
   }
 
   const toolbar = (
@@ -93,14 +93,14 @@ export function Workspace({ active }: { active: boolean }) {
         <h2>{t('wsTitle')}</h2>
         <p>{t('wsSubtitle')}</p>
       </div>
-      <div className="ws-tools" role="group" aria-label={t('wsTitle')}>
+      <div className="ws-tools" role="group" aria-label={t('wsAriaOps')}>
         <Button variant="ghost" size="icon"
           title={expanded ? t('wsExitFullscreen') : t('wsFullscreen')} aria-label={expanded ? t('wsExitFullscreen') : t('wsFullscreen')}
           onClick={() => setExpanded(value => !value)}>
           {expanded ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
         </Button>
         {state === 'ready' && <>
-          <Button variant="ghost" size="icon" title={t('overviewRefresh')} aria-label={t('overviewRefresh')} onClick={() => void refresh()}><RefreshCw size={17} /></Button>
+          <Button variant="ghost" size="icon" title={t('wsRefresh')} aria-label={t('wsRefresh')} onClick={() => void refresh()}><RefreshCw size={17} /></Button>
           <Button variant="ghost" size="icon" title={t('wsSettings')} aria-label={t('wsSettings')}
             onClick={() => frame.current?.contentWindow?.postMessage({ type: 'ofm:engine-action', action: 'settings' }, window.location.origin)}>
             <Settings2 size={17} />
@@ -119,7 +119,7 @@ export function Workspace({ active }: { active: boolean }) {
             allow="clipboard-write" referrerPolicy="same-origin"
             onLoad={syncTheme} />
         : <div className="ws-empty" role="status">
-            <span>{state === 'starting' ? t('wsStarting') : t('wsFailed')}</span>
+            <span>{state === 'starting' ? t('wsStarting') : t('wsStartFailed')}</span>
             {state === 'error' && <Button onClick={() => { started.current = false; setGeneration(n => n + 1) }}>{t('retry')}</Button>}
           </div>}
     </div>

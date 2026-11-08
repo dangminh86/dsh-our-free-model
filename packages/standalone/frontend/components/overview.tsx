@@ -76,7 +76,7 @@ export function Overview({ summary, stats, host }: Snapshot & { host: Host }) {
 
       <Card className="quick-connect ov-quick">
         <div className="quick-icon ov-quick-icon"><Terminal size={20} /></div>
-        <h2>{t('navConnection')}</h2><p>OpenAI 兼容 · Chat Completions / Responses</p>
+        <h2>{t('navConnection')}</h2><p>{isEn ? 'OpenAI Compatible · Chat Completions / Responses' : 'OpenAI 兼容 · Chat Completions / Responses'}</p>
         <label>API BASE URL</label>
         <div className="quick-endpoint ov-endpoint"><code>{summary.baseUrl}/v1</code>
           <Button variant="ghost" aria-label={t('copyApiUrl')} onClick={copyEndpoint} title={t('copyApiUrl')}

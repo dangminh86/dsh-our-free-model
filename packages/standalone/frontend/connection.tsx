@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { Cable, Check, CircleCheck, Copy, Eye, EyeOff, KeyRound, Link2, LockKeyhole, RotateCcw, ShieldAlert, Terminal } from 'lucide-react'
 import { Button, Card } from './components/ui'
 import type { Host, Summary } from './types'
-import { useT } from './i18n'
+import { useT, useLocale } from './i18n'
 
 export function Connection({ summary, host, active }: { summary: Summary; host: Host; active: boolean }) {
   const t = useT()
+  const [locale] = useLocale()
+  const isEn = locale === 'en'
   const [apiKey, setApiKey] = useState('')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState('')
@@ -17,7 +19,7 @@ export function Connection({ summary, host, active }: { summary: Summary; host: 
   const example = `curl ${summary.baseUrl}/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
-  -d '${JSON.stringify({ model, messages: [{ role: 'user', content: '你好' }] })}'`
+  -d '${JSON.stringify({ model, messages: [{ role: 'user', content: isEn ? 'Hello' : '你好' }] })}'`
   const run = async (action: () => Promise<void>, message = '') => {
     setBusy(true); setNotice(''); setError('')
     try { await action(); if (message) setNotice(message) }

@@ -7,7 +7,11 @@ import { filterModels } from './models-data.mjs'
 import { visibilityCopy } from './visibility-data.mjs'
 import type { Host, Model, ModelTestResult, ServiceSettings, Summary } from './types'
 import './models.css'
-import { useT, useLocale } from './i18n'
+import { useT, useLocale, type TranslationKey } from './i18n'
+
+type Operation = 'refresh' | 'probe' | 'test'
+type TestState = { model: Model; state: 'pending' | 'success' | 'error' | 'cancelled'; result?: ModelTestResult; error?: string }
+const initialFilters = { search: '', channel: 'all', capability: 'all', availability: 'all', access: 'all' }
 
 export function Models({ summary, host, active }: { summary: Summary; host: Host; active: boolean }) {
   const t = useT()
@@ -16,29 +20,26 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   const visibility = visibilityCopy(locale)
 
   const availabilityNames: Record<string, string> = {
-    available: t('avail_available'),
-    listed: t('avail_listed'),
-    unknown: t('avail_unknown'),
-    unavailable: t('avail_unavailable'),
-    throttled: t('avail_throttled'),
-    'region-blocked': t('avail_region_blocked'),
+    available: t('mdAvailAvailable'),
+    listed: t('mdAvailListed'),
+    unknown: t('mdAvailUnknown'),
+    unavailable: t('mdAvailUnavailable'),
+    throttled: t('mdAvailThrottled'),
+    'region-blocked': t('mdAvailRegionBlocked'),
   }
 
   const sourceNames: Record<string, string> = {
-    anonymous: t('src_anonymous'),
-    kilo: t('src_kilo'),
-    eac: t('src_eac'),
+    anonymous: t('mdSourceAnon'),
+    kilo: t('mdSourceKilo'),
+    eac: t('mdSourceEac'),
   }
 
   const channelName = (id: string) => sourceNames[id]
     ?? providers.find(provider => provider.id === id)?.name ?? id
+
   const number = (value: number) => new Intl.NumberFormat(isEn ? 'en-US' : 'zh-CN').format(value)
   const capacity = (value?: number) => value && Number.isFinite(value) && value > 0
     ? value >= 1000 ? `${Number((value / 1000).toFixed(1))}K` : number(value) : (isEn ? 'Unknown' : '未知')
-
-  const initialFilters = { search: '', channel: 'all', capability: 'all', availability: 'all', access: 'all' }
-  type Operation = 'refresh' | 'probe' | 'test'
-  type TestState = { model: Model; state: 'pending' | 'success' | 'error' | 'cancelled'; result?: ModelTestResult; error?: string }
 
   const [filters, setFilters] = useState(initialFilters)
   const [operation, setOperation] = useState<Operation>()
@@ -53,6 +54,7 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   const pending = useRef<AbortController | undefined>(undefined)
   const activeRef = useRef(active)
   activeRef.current = active
+
   const models = useMemo<Model[]>(() => filterModels(summary.catalog, filters), [summary.catalog, filters])
   const channels = useMemo(() => [...new Set(['anonymous', 'kilo', 'eac', ...summary.catalog.map(model => model.channel), filters.channel])]
     .filter(id => id !== 'all'), [summary.catalog, filters.channel])
@@ -61,16 +63,19 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
     const visible = defaultRangeExtractor(range)
     return focusedIndex >= 0 ? [...new Set([...visible, focusedIndex])].sort((a, b) => a - b) : visible
   }, [focusedIndex])
+
   const virtual = useVirtualizer({
     count: models.length, getScrollElement: () => scrollRef.current,
     estimateSize: () => 112, overscan: 5, enabled: active,
     getItemKey: index => models[index].id, rangeExtractor,
   })
+
   const changeFilters = (patch: Partial<typeof initialFilters>) => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0
     setFilters(previous => ({ ...previous, ...patch }))
     setFocusedId(undefined)
   }
+
   useEffect(() => {
     if (!active) {
       pending.current?.abort()
@@ -80,6 +85,7 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
     }
     return () => { pending.current?.abort(); pending.current = undefined }
   }, [active])
+
   useEffect(() => {
     if (active && scrollRef.current) {
       const max = Math.max(0, virtual.getTotalSize() - scrollRef.current.clientHeight)
@@ -88,6 +94,7 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
   }, [models.length, active, virtual])
 
   const run = async (kind: Operation, model?: Model) => {
+    const tr = (key: TranslationKey, fallback: string) => typeof t !== 'undefined' ? t(key) : fallback
     if (pending.current || !activeRef.current) return
     const controller = new AbortController()
     pending.current = controller
@@ -103,17 +110,17 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
           await host.refresh()
         } catch (reason) {
           if (!isCurrent()) return
-          const detail = reason instanceof Error ? reason.name === 'TimeoutError' ? '请求超时，请重试。' : reason.message : '请求失败，请重试。'
-          setError(`模型测试已成功，但刷新摘要失败：${detail}`)
+          const detail = reason instanceof Error ? reason.name === 'TimeoutError' ? tr('errTimeout', '请求超时，请重试。') : reason.message : tr('errRequestFailed', '请求失败，请重试。')
+          setError(tr('mdTestSuccessRefreshFailed', '模型测试已成功，但刷新摘要失败：{detail}').replace('{detail}', detail))
         }
       } else {
         await host.refreshModels(kind === 'probe', controller.signal)
         if (!isCurrent()) return
-        setMessage(kind === 'probe' ? '可用性探测已完成' : '模型清单已更新')
+        setMessage(kind === 'probe' ? tr('mdProbeDone', '可用性探测完成') : tr('mdCatalogUpdated', '模型清单已更新'))
       }
     } catch (reason) {
       if (!isCurrent()) return
-      const detail = reason instanceof Error ? reason.name === 'TimeoutError' ? '请求超时，请重试。' : reason.message : '操作失败，请重试。'
+      const detail = reason instanceof Error ? reason.name === 'TimeoutError' ? tr('errTimeout', '请求超时，请重试。') : reason.message : tr('cxOpFailed', '操作失败，请重试。')
       if (kind === 'test' && model) setTest({ model, state: 'error', error: detail })
       else setError(detail)
     } finally {
@@ -159,47 +166,47 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
 
   return <div className="model-browser" data-testid="models-ready">
     <header className="dashboard-heading">
-      <div><div className="heading-eyebrow">WORKSPACE / MODELS</div><h1>{t('navModels')}</h1>
-        <p>{number(summary.catalog.length)} {t('modelsCount')} · {number(routable)} {t('modelsRoutable')}</p></div>
+      <div><div className="heading-eyebrow">WORKSPACE / MODELS</div><h1>{t('mdTitle')}</h1>
+        <p>{t('mdSubtitle').replace('{total}', number(summary.catalog.length)).replace('{routable}', number(routable))}</p></div>
       <div className="actions">
         <Button variant="outline" disabled={!!operation} onClick={() => { void run('refresh') }}>
-          <RefreshCw size={15} className={operation === 'refresh' ? 'spinning' : ''} />{operation === 'refresh' ? t('refreshingCatalog') : t('refreshCatalog')}
+          <RefreshCw size={15} className={operation === 'refresh' ? 'spinning' : ''} />{operation === 'refresh' ? t('mdRefreshing') : t('mdRefreshList')}
         </Button>
-        <Button disabled={!!operation || !summary.settings.enabled} title={t('probeHint')}
+        <Button disabled={!!operation || !summary.settings.enabled} title={t('mdProbeTitle')}
           onClick={() => { void run('probe') }}>
           {operation === 'probe' ? <LoaderCircle size={15} className="spinning" /> : <CircleCheck size={15} />}
-          {operation === 'probe' ? t('probingAvailability') : t('probeAvailability')}
+          {operation === 'probe' ? t('mdProbing') : t('mdProbeAvail')}
         </Button>
       </div>
     </header>
     <div className="model-summary">
-      <span><span className={`status-dot ${summary.settings.enabled ? '' : 'paused'}`} />{summary.settings.enabled ? t('serviceEnabled') : t('servicePaused')}</span>
-      <span>{t('catalogSynced')}{summary.catalogSyncedAt ? new Date(summary.catalogSyncedAt).toLocaleString(isEn ? 'en-US' : 'zh-CN', { hour12: false }) : t('notYetRefreshed')}</span>
-      <span>{t('probeCostHint')}</span>
+      <span><span className={`status-dot ${summary.settings.enabled ? '' : 'paused'}`} />{summary.settings.enabled ? t('mdInferenceEnabled') : t('mdInferencePaused')}</span>
+      <span>{summary.catalogSyncedAt ? t('mdListUpdated').replace('{time}', new Date(summary.catalogSyncedAt).toLocaleString(isEn ? 'en-US' : 'zh-CN', { hour12: false })) : t('mdNotRefreshed')}</span>
+      <span>{t('mdProbeNotice')}</span>
     </div>
     {error && <div className="channel-error" role="alert"><CircleAlert size={16} /><span>{error}</span>
-      <Button variant="ghost" aria-label="close error" title="close error" onClick={() => setError('')}><X size={15} /></Button></div>}
+      <Button variant="ghost" aria-label={t('mdCloseErr')} title={t('mdCloseErr')} onClick={() => setError('')}><X size={15} /></Button></div>}
     {message && <p className="model-feedback" role="status"><Check size={15} />{message}</p>}
     <div className="model-filters">
-      <div className="model-search"><Search size={16} /><Input type="search" aria-label="search" placeholder={t('searchModelPlaceholder')}
+      <div className="model-search"><Search size={16} /><Input type="search" aria-label={t('mdSearchAria')} placeholder={t('mdSearchPlaceholder')}
         value={filters.search} onChange={event => changeFilters({ search: event.target.value })} /></div>
-      <select aria-label="channel" value={filters.channel} onChange={event => changeFilters({ channel: event.target.value })}>
-        <option value="all">{t('allChannels')}</option>{channels.map(id => <option value={id} key={id}>{channelName(id)}</option>)}
+      <select aria-label={t('mdFilterChannelAria')} value={filters.channel} onChange={event => changeFilters({ channel: event.target.value })}>
+        <option value="all">{t('mdFilterChannel')}</option>{channels.map(id => <option value={id} key={id}>{channelName(id)}</option>)}
       </select>
-      <select aria-label="capability" value={filters.capability} onChange={event => changeFilters({ capability: event.target.value })}>
-        <option value="all">{t('allCapabilities')}</option><option value="text">{t('capText')}</option><option value="vision">{t('capVision')}</option><option value="reasoning">{t('capReasoning')}</option>
+      <select aria-label={t('mdFilterCapabilityAria')} value={filters.capability} onChange={event => changeFilters({ capability: event.target.value })}>
+        <option value="all">{t('mdCapAll')}</option><option value="text">{t('mdCapText')}</option><option value="vision">{t('mdCapVision')}</option><option value="reasoning">{t('mdCapReasoning')}</option>
       </select>
-      <select aria-label="availability" value={filters.availability} onChange={event => changeFilters({ availability: event.target.value })}>
-        <option value="all">{t('allStatuses')}</option>{Object.entries(availabilityNames).map(([id, name]) => <option value={id} key={id}>{name}</option>)}
+      <select aria-label={t('mdFilterAvailAria')} value={filters.availability} onChange={event => changeFilters({ availability: event.target.value })}>
+        <option value="all">{t('mdAvailAll')}</option>{Object.entries(availabilityNames).map(([id, name]) => <option value={id} key={id}>{name}</option>)}
       </select>
     </div>
     <div className="model-list-toolbar">
-      <div className="channel-filters" role="group" aria-label="access filter">
-        {([['all', t('allModelsFilter')], ['routable', t('routableFilter')], ['hidden', t('hiddenFilter')]] as const).map(([id, name]) =>
+      <div className="channel-filters" role="group" aria-label={t('mdScopeAria')}>
+        {([['all', t('mdScopeAll')], ['routable', t('mdScopeRoutable')], ['hidden', t('mdScopeHidden')]] as const).map(([id, name]) =>
           <button key={id} aria-pressed={filters.access === id} onClick={() => changeFilters({ access: id })}>{name}</button>)}
       </div>
-      <span role="status" data-testid="model-result-count">{number(models.length)} / {number(summary.catalog.length)} {t('modelsCount')}</span>
-      {filtered && <Button variant="ghost" onClick={() => changeFilters(initialFilters)}><X size={14} />{t('clearFilters')}</Button>}
+      <span role="status" data-testid="model-result-count">{t('mdResultCount').replace('{count}', number(models.length)).replace('{total}', number(summary.catalog.length))}</span>
+      {filtered && <Button variant="ghost" onClick={() => changeFilters(initialFilters)}><X size={14} />{t('mdClearFilters')}</Button>}
     </div>
     <div className="model-list-toolbar">
       <label><input type="checkbox" role="switch" checked={summary.settings.hideFreeModels === true}
@@ -207,20 +214,20 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
       <label><input type="checkbox" role="switch" checked={summary.settings.hideEacModels === true}
         disabled={visibilitySaving} onChange={event => { void saveVisibility({ hideEacModels: event.target.checked }) }} /> {visibility.hideEac}</label>
     </div>
-    {test && <section className={`model-test-result model-test-${test.state}`} aria-label={t('testing')} aria-live="polite">
+    {test && <section className={`model-test-result model-test-${test.state}`} aria-label={isEn ? 'Model test result' : '模型测试结果'} aria-live="polite">
       <div className="model-test-heading"><div><strong>
-        {test.state === 'pending' ? t('testing') : test.state === 'success' ? t('testCompleted') : test.state === 'cancelled' ? t('testCancelled') : t('testFailed')}
+        {test.state === 'pending' ? t('mdTestPending') : test.state === 'success' ? t('mdTestSuccess') : test.state === 'cancelled' ? t('mdTestCancelled') : t('mdTestFailed')}
       </strong><span>{test.model.name}{test.result && ` · ${number(test.result.latencyMs)} ms`}</span></div>
-        {test.state === 'pending' ? <Button variant="outline" onClick={cancel}><Square size={14} />{t('cancelTest')}</Button>
-          : <Button variant="ghost" aria-label="close" title="close" onClick={() => setTest(undefined)}><X size={15} /></Button>}
+        {test.state === 'pending' ? <Button variant="outline" onClick={cancel}><Square size={14} />{t('mdCancelTest')}</Button>
+          : <Button variant="ghost" aria-label={t('mdCloseTest')} title={t('mdCloseTest')} onClick={() => setTest(undefined)}><X size={15} /></Button>}
       </div>
-      {test.state === 'success' && <><pre>{test.result?.text}</pre>{test.result?.persisted === false && <p role="status">{t('testSuccessNotSaved')}</p>}</>}
+      {test.state === 'success' && <><pre>{test.result?.text}</pre>{test.result?.persisted === false && <p role="status">{t('mdTestPersistWarn')}</p>}</>}
       {test.state === 'error' && <p>{test.error}</p>}
     </section>}
-    {models.length ? <div className="model-table" role="table" aria-label={t('navModels')} aria-rowcount={models.length + 1} aria-colcount={5}>
-      <div className="model-table-header" role="row"><span role="columnheader">{t('colModelId')}</span><span role="columnheader">{t('colChannelCaps')}</span>
-        <span role="columnheader">{t('colContextOutput')}</span><span role="columnheader">{t('colAvailability')}</span><span role="columnheader">{t('colActions')}</span></div>
-      <div ref={scrollRef} className="model-scroll" role="rowgroup" tabIndex={0} aria-label="scroll" onKeyDown={event => {
+    {models.length ? <div className="model-table" role="table" aria-label={t('mdTitle')} aria-rowcount={models.length + 1} aria-colcount={5}>
+      <div className="model-table-header" role="row"><span role="columnheader">{t('mdColModelId')}</span><span role="columnheader">{t('mdColChannelCap')}</span>
+        <span role="columnheader">{t('mdColContextOutput')}</span><span role="columnheader">{t('mdColStatus')}</span><span role="columnheader">{t('mdColActions')}</span></div>
+      <div ref={scrollRef} className="model-scroll" role="rowgroup" tabIndex={0} aria-label={t('mdScrollAria')} onKeyDown={event => {
         if (event.target !== event.currentTarget) return
         if (event.key === 'Home' || event.key === 'End') {
           event.preventDefault()
@@ -233,8 +240,8 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
             const state = model.availabilitySource === 'listing' ? 'listed' : model.availability ?? 'unknown'
             const manual = model.availabilitySource === 'manual'
             const failed = manual && state === 'unknown'
-            const availabilityName = failed ? t('avail_tested_failed') : manual && state === 'available' ? t('avail_tested_available') : availabilityNames[state] ?? t('avail_unknown_state')
-            const disabledReason = !summary.settings.enabled ? t('servicePaused') : !model.routable && !model.hiddenByUser ? (isEn ? 'Model not public, check channel accounts' : '模型尚未公开，请检查渠道账号或模型设置') : operation ? (isEn ? 'Please wait for current operation' : '请等待当前操作完成') : ''
+            const availabilityName = failed ? t('mdAvailManualFailed') : manual && state === 'available' ? t('mdAvailManualAvailable') : availabilityNames[state] ?? t('mdAvailUnknownState')
+            const disabledReason = !summary.settings.enabled ? t('servicePaused') : !model.routable && !model.hiddenByUser ? t('mdModelNotRoutable') : operation ? t('mdWaitOp') : ''
             return <div role="row" aria-rowindex={item.index + 2} key={item.key} data-index={item.index} data-model-id={model.id}
               className="model-table-row" ref={virtual.measureElement} style={{ transform: `translateY(${item.start}px)` }}
               onFocusCapture={() => setFocusedId(model.id)} onBlurCapture={event => {
@@ -242,15 +249,15 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
               }}>
               <div role="cell" className="model-identity"><strong>{model.name}</strong><code>{model.id}</code></div>
               <div role="cell" className="model-source"><span>{channelName(model.channel)}</span><div className="model-capabilities">
-                <Badge>{model.vision ? (isEn ? 'Vision' : '视觉') : (isEn ? 'Text' : '纯文本')}</Badge>{model.reasoning && <Badge tone="blue">{isEn ? 'Reasoning' : '思考'}</Badge>}</div></div>
-              <div role="cell" className="model-limits"><span title={model.contextWindow ? `${model.contextWindow} Token` : undefined}>{capacity(model.contextWindow)} <small>{t('capContext')}</small></span>
-                <span title={model.maxOutput ? `${model.maxOutput} Token` : undefined}>{capacity(model.maxOutput)} <small>{t('capOutput')}</small></span></div>
+                <Badge>{model.vision ? t('mdBadgeVision') : t('mdBadgeText')}</Badge>{model.reasoning && <Badge tone="blue">{t('mdBadgeReasoning')}</Badge>}</div></div>
+              <div role="cell" className="model-limits"><span title={model.contextWindow ? `${model.contextWindow} Token` : undefined}>{capacity(model.contextWindow)} <small>{t('mdContextLabel')}</small></span>
+                <span title={model.maxOutput ? `${model.maxOutput} Token` : undefined}>{capacity(model.maxOutput)} <small>{t('mdOutputLabel')}</small></span></div>
               <div role="cell" className="model-state"><Badge tone={state === 'available' ? 'success' : failed || ['unavailable', 'throttled', 'region-blocked'].includes(state) ? 'warning' : 'neutral'}>
                 {availabilityName}</Badge>
                 {manual && state !== 'available' && model.detail && <small title={model.detail}
                   style={{ maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{model.detail}</small>}
-                {!model.routable && <small>{model.hiddenByUser ? visibility.hidden : (isEn ? 'Not public' : '未公开')}</small>}
-                {model.ttftMs != null && <small>{t('ttftLabel')} {number(model.ttftMs)} ms</small>}</div>
+                {!model.routable && <small>{model.hiddenByUser ? visibility.hidden : t('mdUnlisted')}</small>}
+                {model.ttftMs != null && <small>{t('mdTtftLabel').replace('{ms}', number(model.ttftMs))}</small>}</div>
               <div role="cell" className="model-row-actions">
                 {['anonymous', 'kilo', 'eac', 'aggregate', 'combo'].includes(model.channel) && <Button variant="ghost"
                   disabled={visibilitySaving || model.hiddenByGroup === true}
@@ -259,24 +266,24 @@ export function Models({ summary, host, active }: { summary: Summary; host: Host
                   onClick={() => { const ids = summary.settings.hiddenModelIds ?? []; void saveVisibility({
                     hiddenModelIds: ids.includes(model.id) ? ids.filter(id => id !== model.id) : [...ids, model.id],
                   }) }}>{model.hiddenByUser ? <Eye size={16} /> : <EyeOff size={16} />}</Button>}
-                <Button variant="ghost" title={`Copy ${model.id}`} aria-label={`Copy model ID: ${model.id}`} onClick={() => copyModelId(model)}
+                <Button variant="ghost" title={`Copy ${model.id}`} aria-label={`Copy ${model.id}`} onClick={() => copyModelId(model)}
                   className={copied === model.id ? 'md-copy-done' : ''}>
                   {copied === model.id ? <Check size={16} /> : <Copy size={16} />}
                 </Button>
-                <Button variant="outline" disabled={!!disabledReason} title={disabledReason || `${t('testBtn')} ${model.name}`}
-                  aria-label={`${t('testBtn')}: ${model.id}`} onClick={() => { void run('test', model) }}
+                <Button variant="outline" disabled={!!disabledReason} title={disabledReason || t('mdTestHover').replace('{name}', model.name)}
+                  aria-label={`Test ${model.id}`} onClick={() => { void run('test', model) }}
                   className={operation === 'test' && test?.model.id === model.id ? 'md-testing' : ''}>
-                  {operation === 'test' && test?.model.id === model.id ? <LoaderCircle size={14} className="spinning" /> : <Play size={14} />}{t('testBtn')}
+                  {operation === 'test' && test?.model.id === model.id ? <LoaderCircle size={14} className="spinning" /> : <Play size={14} />}{t('mdTestBtn')}
                 </Button>
               </div>
             </div>
           })}
         </div>
       </div>
-    </div> : <div className="model-empty"><Boxes size={28} /><h2>{summary.catalog.length ? t('noMatchingModels') : t('emptyCatalog')}</h2>
-      <p>{summary.catalog.length ? t('adjustFiltersHint') : t('refreshCatalogHint')}</p>
-      {filtered && <Button variant="outline" onClick={() => changeFilters(initialFilters)}><SlidersHorizontal size={15} />{t('clearFilters')}</Button>}
+    </div> : <div className="model-empty"><Boxes size={28} /><h2>{summary.catalog.length ? t('mdEmptyMatch') : t('mdEmptyCatalog')}</h2>
+      <p>{summary.catalog.length ? t('mdEmptyMatchSub') : t('mdEmptyCatalogSub')}</p>
+      {filtered && <Button variant="outline" onClick={() => changeFilters(initialFilters)}><SlidersHorizontal size={15} />{t('mdClearFilters')}</Button>}
     </div>}
-    <p className="footnote">{t('catalogDisclaimer')}</p>
+    <p className="footnote">{t('mdFootnote')}</p>
   </div>
 }

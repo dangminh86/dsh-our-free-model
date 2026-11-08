@@ -4,7 +4,7 @@ import { Badge, Button, Card } from './components/ui'
 import { management } from './management'
 import './settings.css'
 import './desktop-update.css'
-import { useT } from './i18n'
+import { useT, useLocale } from './i18n'
 
 interface UpdateStatus {
   currentVersion: string
@@ -23,6 +23,8 @@ const bytes = (value: number) => `${(value / 1024 / 1024).toFixed(1)} MB`
 
 export function DesktopUpdate() {
   const t = useT()
+  const [locale] = useLocale()
+  const isEn = locale === 'en'
   const [status, setStatus] = useState<UpdateStatus | null>(null)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
@@ -31,7 +33,6 @@ export function DesktopUpdate() {
   const live = useRef(true)
   const busyRef = useRef(false)
   const native = hasDesktopBridge()
-
   useEffect(() => {
     live.current = true
     if (!native) return () => { live.current = false }
@@ -43,50 +44,46 @@ export function DesktopUpdate() {
         setStatus(value)
         setLoadError('')
         timer = setTimeout(() => { void poll() }, 1000)
-      } catch (reason) { if (live.current) { setLoadError(reason instanceof Error ? reason.message : t('errRequestFailed')); timer = setTimeout(() => { void poll() }, 5000) } }
+      } catch (reason) { if (live.current) { setLoadError(reason instanceof Error ? reason.message : t('updLoadFailed')); timer = setTimeout(() => { void poll() }, 5000) } }
     }
     void poll()
     return () => { live.current = false; clearTimeout(timer) }
   }, [native, t])
-
   const action = async (name: 'check' | 'download') => {
     if (busyRef.current) return
     busyRef.current = true; setRequesting(true); setError('')
     try { const value = await management<UpdateStatus>(`/desktop-update/${name}`, {}); if (live.current) setStatus(value) }
-    catch (reason) { if (live.current) setError(reason instanceof Error ? reason.message : t('errRequestFailed')) }
+    catch (reason) { if (live.current) setError(reason instanceof Error ? reason.message : t('updReqFailed')) }
     finally { busyRef.current = false; if (live.current) setRequesting(false) }
   }
-
   const install = async () => {
     if (busyRef.current || status?.phase !== 'ready') return
     busyRef.current = true; setInstalling(true); setError('')
     try { await (window as NativeWindow).__TAURI__!.core!.invoke('install_desktop_update') }
     catch (reason) { if (live.current) { setError(String(reason)); setInstalling(false); busyRef.current = false } }
   }
-
   const busy = requesting || installing || status?.phase === 'checking' || status?.phase === 'downloading'
   const percentage = status?.total ? Math.min(100, Math.round(status.received / status.total * 100)) : 0
-
   return <div className="settings-browser desktop-update-browser" data-testid="desktop-update-ready">
     <header className="dashboard-heading"><div><div className="heading-eyebrow">MANAGEMENT / UPDATES</div>
-      <h1>{t('updateTitle')}</h1><p>{t('updateSubtitle')}</p></div>
-      <Badge tone={status?.phase === 'ready' ? 'success' : 'neutral'}>{status?.phase === 'ready' ? t('updateReadyBadge') : t('updateDesktopClient')}</Badge></header>
-    <Card className="settings-card"><div className="settings-card-heading"><RefreshCw size={16} /><div><h2>{t('updateCardHeading')}</h2><p>{t('updateCardSub')}</p></div></div>
-      <div className="desktop-update-versions"><div><small>{t('updateCurrentVer')}</small><strong>{status?.currentVersion ? `v${status.currentVersion}` : '—'}</strong></div>
-        <div><small>{t('updateLatestVer')}</small><strong>{status?.latest ? `v${status.latest.version}` : t('updateNotChecked')}</strong></div>
-        <div><small>{t('updateLastChecked')}</small><span>{status?.checkedAt ? new Date(status.checkedAt).toLocaleString() : t('updateNeverChecked')}</span></div></div>
-      {!native ? <p className="settings-note"><CircleAlert size={15} />请在桌面客户端中打开此栏目，浏览器访问不支持安装应用更新。</p>
-        : status && !status.supported ? <p className="settings-note"><CircleAlert size={15} />当前提供 Windows x64 桌面端内置更新，其他平台请使用对应安装包。</p>
-          : <div className="desktop-update-actions"><Button variant="outline" busy={requesting || status?.phase === 'checking'} disabled={!!busy || !status} onClick={() => { void action('check') }}><RefreshCw size={15} />{t('updateCheckBtn')}</Button>
-            {status?.available && status.phase !== 'ready' && <Button busy={status.phase === 'downloading'} disabled={!!busy} onClick={() => { void action('download') }}><ArrowDownToLine size={15} />{t('updateDownloadBtn')}{status.latest ? ` · ${bytes(status.latest.size)}` : ''}</Button>}
-            {status?.phase === 'ready' && <Button busy={installing} disabled={!!busy} onClick={() => { void install() }}><RotateCw size={15} />{t('updateInstallBtn')}</Button>}</div>}
-      {status?.checkedAt && status.phase === 'idle' && !status.available && <p className="settings-note" role="status"><Check size={15} />{status.latest ? t('updateLatestAlready') : t('updateNoPackageFound')}</p>}
-      {status?.phase === 'downloading' && <div className="desktop-update-progress" role="status"><div><span>{t('updateDownloading')}</span><span>{percentage}% · {bytes(status.received)} / {bytes(status.total)}</span></div><progress aria-label={t('updateDownloading')} max={100} value={percentage} /></div>}
-      {status?.phase === 'ready' && <p className="settings-note" role="status"><ShieldCheck size={15} />{t('updateReadyNote')}</p>}
-      {installing && <p className="settings-note" role="status"><RotateCw size={15} />{t('updatePreparingNote')}</p>}
+      <h1>{t('updTitle')}</h1><p>{t('updSubtitle')}</p></div>
+      <Badge tone={status?.phase === 'ready' ? 'success' : 'neutral'}>{status?.phase === 'ready' ? t('updReadyToInstall') : t('updDesktopClient')}</Badge></header>
+    <Card className="settings-card"><div className="settings-card-heading"><RefreshCw size={16} /><div><h2>{t('updVersions')}</h2><p>{t('updVersionsDesc')}</p></div></div>
+      <div className="desktop-update-versions"><div><small>{t('updCurrentVersion')}</small><strong>{status?.currentVersion ? `v${status.currentVersion}` : '—'}</strong></div>
+        <div><small>{t('updLatestVersion')}</small><strong>{status?.latest ? `v${status.latest.version}` : t('updNotChecked')}</strong></div>
+        <div><small>{t('updLastChecked')}</small><span>{status?.checkedAt ? new Date(status.checkedAt).toLocaleString(isEn ? 'en-US' : 'zh-CN') : t('updNeverChecked')}</span></div></div>
+      {!native ? <p className="settings-note"><CircleAlert size={15} />{t('updOnlyDesktop')}</p>
+        : status && !status.supported ? <p className="settings-note"><CircleAlert size={15} />{t('updWindowsOnly')}</p>
+          : <div className="desktop-update-actions"><Button variant="outline" busy={requesting || status?.phase === 'checking'} disabled={!!busy || !status} onClick={() => { void action('check') }}><RefreshCw size={15} />{t('updCheckBtn')}</Button>
+            {status?.available && status.phase !== 'ready' && <Button busy={status.phase === 'downloading'} disabled={!!busy} onClick={() => { void action('download') }}><ArrowDownToLine size={15} />{t('updDownloadBtn')}{status.latest ? ` · ${bytes(status.latest.size)}` : ''}</Button>}
+            {status?.phase === 'ready' && <Button busy={installing} disabled={!!busy} onClick={() => { void install() }}><RotateCw size={15} />{t('updInstallBtn')}</Button>}</div>}
+      {status?.checkedAt && status.phase === 'idle' && !status.available && <p className="settings-note" role="status"><Check size={15} />{status.latest ? t('updLatestAlready') : t('updNoPkg')}</p>}
+      {status?.phase === 'downloading' && <div className="desktop-update-progress" role="status"><div><span>{t('updDownloading')}</span><span>{percentage}% · {bytes(status.received)} / {bytes(status.total)}</span></div><progress aria-label={t('updProgressAria')} max={100} value={percentage} /></div>}
+      {status?.phase === 'ready' && <p className="settings-note" role="status"><ShieldCheck size={15} />{t('updReadyNote')}</p>}
+      {installing && <p className="settings-note" role="status"><RotateCw size={15} />{t('updInstallingNote')}</p>}
       {(error || loadError || status?.error) && <p className="settings-save-error" role="alert"><CircleAlert size={15} /><span>{error || loadError || status?.error}</span></p>}
     </Card>
-    {status?.latest && <Card className="settings-card"><div className="settings-card-heading"><ArrowDownToLine size={16} /><div><h2>{t('updateNotesTitle')}{status.latest.version}</h2><p>{status.latest.publishedAt ? new Date(status.latest.publishedAt).toLocaleDateString() : t('updateOfficialRelease')}</p></div></div>
-      <div className="desktop-update-notes">{status.latest.notes || t('updateNoNotes')}</div></Card>}
+    {status?.latest && <Card className="settings-card"><div className="settings-card-heading"><ArrowDownToLine size={16} /><div><h2>{t('updNotes').replace('{ver}', status.latest.version)}</h2><p>{status.latest.publishedAt ? new Date(status.latest.publishedAt).toLocaleDateString(isEn ? 'en-US' : 'zh-CN') : t('updOfficialRelease')}</p></div></div>
+      <div className="desktop-update-notes">{status.latest.notes || t('updNoNotes')}</div></Card>}
   </div>
 }
