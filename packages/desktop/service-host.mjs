@@ -27,6 +27,7 @@ try {
     if (args[i] === '--no-refresh') options.refresh = false
     else if (args[i] === '--data-dir' && args[i + 1]) options.dataDir = args[++i]
     else if (args[i] === '--port' && /^\d+$/.test(args[i + 1] ?? '')) options.port = Number(args[++i])
+    else if (args[i] === '--host' && args[i + 1]) options.host = args[++i]
     else throw new Error('桌面服务启动参数无效')
   }
   service = await startStandalone(options)

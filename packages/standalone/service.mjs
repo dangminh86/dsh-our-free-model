@@ -111,7 +111,7 @@ async function acquireServiceLock(dataDir) {
 
 /** 直接创建核心和 HTTP 服务，不加载插件入口、Cordis 或 DSH 凭据。 */
 export async function startStandalone({
-  dataDir = resolveStandaloneDataDir(), host = '127.0.0.1', port,
+  dataDir = resolveStandaloneDataDir(), host, port,
   logger = console, refresh = true, probe, lanEnabled, lanPort,
   startRelay = startLanRelay,
   workbenchOptions, subscriptionOptions,
@@ -121,7 +121,8 @@ export async function startStandalone({
   // host, and the update flow has to be exercisable where CI actually runs.
   desktopPlatform = process.platform, desktopArch = process.arch,
 } = {}) {
-  if (!isLoopbackHost(host)) throw new TypeError('the standalone service binds a loopback address only')
+  const isAllowedBindHost = value => isLoopbackHost(value) || value === '0.0.0.0' || value === '::'
+  if (host !== undefined && !isAllowedBindHost(host)) throw new TypeError('the standalone service binds a loopback address or 0.0.0.0 only')
   if (typeof dataDir !== 'string' || !path.isAbsolute(dataDir)) throw new TypeError('dataDir must be an absolute path')
   if (port !== undefined && (!Number.isInteger(port) || port < 0 || port > 65535)) {
     throw new TypeError('port must be an integer between 0 and 65535')
@@ -241,10 +242,13 @@ export async function startStandalone({
     const existingKey = settings.get().forwardKey
     const key = typeof existingKey === 'string' && existingKey !== '' ? existingKey : generateKey()
     const savedLanPort = settings.get().standaloneLanPort
+    const savedHost = settings.get().standaloneHost
+    const resolvedHost = host ?? (savedHost === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1')
     settings.update({
       forwardKey: key,
       managementKey: typeof settings.get().managementKey === 'string' && settings.get().managementKey !== ''
         && settings.get().managementKey !== key ? settings.get().managementKey : generateKey(),
+      standaloneHost: resolvedHost,
       standaloneLanEnabled: lanEnabled ?? settings.get().standaloneLanEnabled === true,
       standaloneLanPort: lanPort ?? (Number.isInteger(savedLanPort) && savedLanPort >= 0 && savedLanPort <= 65535 ? savedLanPort : 0),
       ...probe === undefined ? {} : { standaloneProbe: probe === true },
@@ -309,7 +313,8 @@ export async function startStandalone({
       onSubscriptionsChanged: () => runtime?.syncAggregateCatalog?.(),
       info: () => ({
         product: PRODUCT, version: VERSION, dataDir,
-        baseUrl: `http://${host === '::1' ? '[::1]' : host}:${listener?.port ?? requestedPort}`,
+        baseUrl: `http://${resolvedHost === '::1' ? '[::1]' : resolvedHost === '0.0.0.0' ? '127.0.0.1' : resolvedHost}:${listener?.port ?? requestedPort}`,
+        host: resolvedHost,
         automaticRefresh: refresh,
         networkMode: process.env.OFM_TEST_UPSTREAM ? 'fixture' : 'live',
         capabilities: { anonymous: true, kilo: true, eac: true, accountChannels: true, webUi: true, lan: true, modelWorkspace: true },
@@ -321,7 +326,7 @@ export async function startStandalone({
       },
     })
     listener = await startForwardServer({
-      config: () => ({ host, port: requestedPort, enabled: settings.get().enabled !== false, key: settings.get().forwardKey }),
+      config: () => ({ host: resolvedHost, port: requestedPort, enabled: settings.get().enabled !== false, key: settings.get().forwardKey }),
       complete: runtime.complete,
       modelRows: runtime.publicModelRows,
       health: () => ({
@@ -387,8 +392,9 @@ export async function startStandalone({
     const ready = Promise.all([channels.ready, refresh ? refreshModels(false) : Promise.resolve()])
     return {
       product: PRODUCT, version: VERSION, dataDir,
-      url: `http://${host === '::1' ? '[::1]' : host}:${listener.port}`,
-      managementUrl: `http://${host === '::1' ? '[::1]' : host}:${listener.port}/${management.bootstrapFragment}`,
+      host: resolvedHost,
+      url: `http://${resolvedHost === '::1' ? '[::1]' : resolvedHost}:${listener.port}`,
+      managementUrl: `http://${resolvedHost === '::1' ? '[::1]' : resolvedHost === '0.0.0.0' ? '127.0.0.1' : resolvedHost}:${listener.port}/${management.bootstrapFragment}`,
       port: listener.port,
       keyFile: path.join(dataDir, 'settings.json'),
       runtime, channels, ready,

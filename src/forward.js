@@ -181,6 +181,9 @@ function failureReply(res, outcome, anthropic = false, force = false) {
 export async function resolveLoopbackBind(host) {
   const value = String(host ?? '').trim() || '127.0.0.1'
   const literal = value.replace(/^\[|\]$/g, '')
+  if (literal === '0.0.0.0' || literal === '::') {
+    return literal
+  }
   if (net.isIP(literal)) {
     if (!isLoopbackIp(literal)) throw new Error(`the forward listener binds a loopback address only (got ${value})`)
     return literal

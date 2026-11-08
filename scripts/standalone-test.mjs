@@ -132,10 +132,16 @@ try {
   })
   await check('routable binds and invalid ports fail before creating data', async () => {
     const invalidDir = path.join(scratch, 'invalid')
-    await assert.rejects(startStandalone({ dataDir: invalidDir, host: '0.0.0.0' }), /loopback/)
+    await assert.rejects(startStandalone({ dataDir: invalidDir, host: '8.8.8.8' }), /loopback|0\.0\.0\.0/)
     await assert.rejects(startStandalone({ dataDir: invalidDir, port: -1 }), /port/)
     await assert.rejects(startStandalone({ dataDir: invalidDir, port: 65536 }), /port/)
     assert.equal(fs.existsSync(invalidDir), false)
+  })
+  await check('bind host accepts 0.0.0.0 as well as 127.0.0.1', async () => {
+    const zeroDir = path.join(scratch, 'zero-host')
+    const service = await startStandalone({ dataDir: zeroDir, host: '0.0.0.0', port: 0, refresh: false, logger: { warn() {} } })
+    assert.equal(service.host, '0.0.0.0')
+    await service.close()
   })
   await check('退出时保留已被替换的其他锁，不清理无法确认归属的文件', async () => {
     const directory = path.join(scratch, 'replaced-lock')

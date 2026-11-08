@@ -21,6 +21,7 @@ export interface Model {
 export interface ModelTestResult { ok: boolean; text: string; latencyMs: number; ttftMs?: number; persisted?: boolean }
 export interface ServiceSettings {
   enabled: boolean
+  standaloneHost?: '127.0.0.1' | '0.0.0.0' | string
   exposeRegionModels: boolean
   hiddenModelIds: string[]
   hideFreeModels: boolean

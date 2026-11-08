@@ -898,6 +898,7 @@ await checkAsync('resolveLoopbackBind refuses a routable resolution', async () =
 })
 await checkAsync('resolveLoopbackBind accepts loopback literals and localhost', async () => {
   assert.equal(await resolveLoopbackBind('127.0.0.1'), '127.0.0.1')
+  assert.equal(await resolveLoopbackBind('0.0.0.0'), '0.0.0.0')
   const resolved = await resolveLoopbackBind('localhost')
   assert.ok(resolved === '127.0.0.1' || resolved === '::1', `localhost must resolve to a loopback address, got ${resolved}`)
 })

@@ -103,6 +103,30 @@ export function Settings({ summary, host, active }: { summary: Summary; host: Ho
       <fieldset disabled={saving} className="settings-fieldset">
         <Card className="settings-card"><div className="settings-card-heading"><Settings2 size={16} /><div><h2>{t('settingsInferenceSection')}</h2><p>{t('settingsInferenceSub')}</p></div></div>
           {toggle('enabled', t('settingsEnableInference'), t('settingsEnableInferenceHelp'))}
+          <div className="settings-field">
+            <span><strong>{t('settingsBindHost')}</strong><small>{t('settingsBindHostHelp')}</small></span>
+            <div className="settings-number">
+              <select
+                id="setting-standaloneHost"
+                name="standaloneHost"
+                aria-label={t('settingsBindHost')}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-layer-2, #18222d)',
+                  color: 'inherit',
+                  fontSize: '13px',
+                }}
+                value={state.draft.standaloneHost ?? '127.0.0.1'}
+                onChange={event => update('standaloneHost' as any, event.target.value as any)}
+              >
+                <option value="127.0.0.1">{t('settingsHostLocalOnly')}</option>
+                <option value="0.0.0.0">{t('settingsHostAllInterfaces')}</option>
+              </select>
+            </div>
+          </div>
           {toggle('exposeRegionModels', t('settingsExposeRegion'), t('settingsExposeRegionHelp'))}
           {toggle('hideFreeModels', visibility.hideFree, t('settingsHideFreeHelp'))}
           {toggle('hideEacModels', visibility.hideEac, t('settingsHideEacHelp'))}

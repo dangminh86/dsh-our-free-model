@@ -63,7 +63,9 @@ function validateSettings(patch) {
   const result = {}
   for (const [key, value] of Object.entries(patch)) {
     if (Object.hasOwn(visibility, key)) { result[key] = visibility[key]; continue }
-    if (booleans.has(key)) {
+    if (key === 'standaloneHost') {
+      if (value !== '127.0.0.1' && value !== '0.0.0.0') throw fail(400, 'standaloneHost 必须是 127.0.0.1 或 0.0.0.0')
+    } else if (booleans.has(key)) {
       if (typeof value !== 'boolean') throw fail(400, `${key} 必须是布尔值`)
     } else if (Object.hasOwn(numbers, key)) {
       const [min, max] = numbers[key]
@@ -78,6 +80,7 @@ export function managementSettings(value) {
   return {
     ...publicModelVisibility(value),
     enabled: value.enabled !== false,
+    standaloneHost: value.standaloneHost === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1',
     exposeRegionModels: value.exposeRegionModels !== false,
     streamRecovery: value.streamRecovery !== false,
     standaloneProbe: value.standaloneProbe === true,
@@ -677,7 +680,7 @@ export function createManagement({ stores, runtime, channels, eac, subscriptions
       // origin and sends no session. It must be decided before both the
       // same-site source fence and the session check.
       else if (pageAsset) servePluginAsset(req, res, pathname)
-      else if (malformedSource || structuralRejection(req) !== undefined) json(res, 403, { error: '管理接口仅允许本机同源访问' })
+      else if (malformedSource || (stores.settings.get().standaloneHost !== '0.0.0.0' && structuralRejection(req) !== undefined)) json(res, 403, { error: '管理接口仅允许本机同源访问' })
       else if (asset) {
         if (req.method !== 'GET' && req.method !== 'HEAD') json(res, 405, { error: '资源仅支持 GET 或 HEAD' })
         else {

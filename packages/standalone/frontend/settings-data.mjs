@@ -9,6 +9,7 @@ export function settingsDraft(settings) {
     standaloneProbe: settings.standaloneProbe,
     defaultMaxTokens: String(settings.defaultMaxTokens),
     probeIntervalMinutes: String(settings.probeIntervalMinutes),
+    ...settings.standaloneHost !== undefined ? { standaloneHost: settings.standaloneHost } : {},
   }
 }
 
@@ -50,6 +51,7 @@ export function validateSettingsDraft(draft, isEn = false) {
       hideFreeModels: draft.hideFreeModels, hideEacModels: draft.hideEacModels,
       streamRecovery: draft.streamRecovery, standaloneProbe: draft.standaloneProbe,
       defaultMaxTokens: Number(draft.defaultMaxTokens), probeIntervalMinutes: Number(draft.probeIntervalMinutes),
+      ...draft.standaloneHost !== undefined ? { standaloneHost: draft.standaloneHost === '0.0.0.0' ? '0.0.0.0' : '127.0.0.1' } : {},
     },
   }
 }
