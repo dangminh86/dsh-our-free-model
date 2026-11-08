@@ -60,6 +60,46 @@ export const DISCLAIMER = Object.freeze({
   reopen: '查看免责声明',
 })
 
+export const DISCLAIMER_EN = Object.freeze({
+  version: DISCLAIMER_VERSION,
+  title: 'Terms of Use & Disclaimer',
+  subtitle: 'About unsupported channels and boundaries of responsibility',
+  intro: 'This project is a personal learning and technical research initiative for studying model gateways, protocol adaptation, and local routing. It is provided "as is", without any commercial service or product commitments.',
+  sections: Object.freeze([
+    {
+      id: 'excluded',
+      heading: 'This build excludes three specific channels',
+      body: 'This software does not include or provide WorkBuddy Domestic (workbuddy / CodeBuddy), WorkBuddy International (workbuddy-ai), or Huawei Cloud MaaS (huaweicloud, including Token Plan). All three have been removed on both the plugin and desktop surfaces. Their absence is an intentional project decision, not a bug, and future updates will not reintroduce them.',
+    },
+    {
+      id: 'responsibility',
+      heading: 'Third-party channel use is solely your responsibility',
+      body: 'If you use these channels or other third-party services outside this plugin by any means—including custom endpoint configurations, credential imports, third-party software, or third-party accounts—you do so entirely at your own risk. The project authors and team do not participate, endorse, support, or assume liability for third-party availability or compliance.',
+    },
+    {
+      id: 'accounts',
+      heading: 'You are responsible for your accounts and credentials',
+      body: 'Credentials you provide are stored locally on your machine and never uploaded to external servers. Please ensure your account usage complies with service provider terms and local laws. Any bans, billing charges, data risks, or losses are the sole responsibility of the user.',
+    },
+    {
+      id: 'no-warranty',
+      heading: 'No warranty provided',
+      body: 'This project makes no express or implied warranties regarding correctness, stability, merchantability, or fitness for a particular purpose. Authors and contributors assume no liability for direct or indirect damages arising from use.',
+    },
+    {
+      id: 'lawful',
+      heading: 'Please use lawfully and in compliance',
+      body: 'This project is strictly for personal learning and technical research. Do not use it to violate provider terms of service, bypass authorization controls, abuse quotas in bulk, or for any unlawful purposes.',
+    },
+  ]),
+  accept: 'I have read and understand',
+  reopen: 'View Disclaimer',
+})
+
+export function getDisclaimer(locale) {
+  return String(locale).toLowerCase().startsWith('en') ? DISCLAIMER_EN : DISCLAIMER
+}
+
 /** Whether a stored acknowledgement matches the current copy version. */
 export function disclaimerAcknowledged(settings) {
   return Number(settings?.disclaimerAck) === DISCLAIMER_VERSION

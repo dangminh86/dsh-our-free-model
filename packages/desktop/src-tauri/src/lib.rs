@@ -168,8 +168,8 @@ pub fn run() {
                 .title("Our Free Model").inner_size(400.0, 300.0).center()
                 .resizable(false).decorations(false).always_on_top(true).skip_taskbar(true)
                 .build()?;
-            let show = MenuItem::with_id(app, "show", "打开面板", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Open Panel", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Exit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &quit])?;
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("已配置应用图标").clone())
@@ -199,7 +199,7 @@ pub fn run() {
                     stop_service(&handle);
                     let message = serde_json::to_string(&message).unwrap();
                     let _ = WebviewWindowBuilder::new(&handle, "main", WebviewUrl::App("error.html".into()))
-                        .title("Our Free Model — 启动失败").inner_size(620.0, 300.0).center()
+                        .title("Our Free Model — Startup Failed").inner_size(620.0, 300.0).center()
                         .initialization_script(format!("document.addEventListener('DOMContentLoaded',()=>{{document.getElementById('reason').textContent={message};}})"))
                         .build();
                 }
